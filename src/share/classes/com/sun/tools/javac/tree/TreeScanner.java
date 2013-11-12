@@ -311,4 +311,8 @@ public class TreeScanner extends Visitor {
     public void visitTree(JCTree tree) {
         Assert.error();
     }
+    
+    public void visitProxyApply(JCProxyApply tree){
+        
+    }
 }

@@ -976,9 +976,29 @@ public class JavacParser implements Parser {
                 typeArgs = null;
             } else return illegal();
             break;
-        case IDENTIFIER: case ASSERT: case ENUM:
+        case IDENTIFIER: case ASSERT: case ENUM: case PROXY:
             if (typeArgs != null) return illegal();
-            t = toP(F.at(S.pos()).Ident(ident()));
+           
+            
+            if (S.token() == PROXY){
+                pos = S.pos();
+                S.nextToken();
+                if (S.token() == LT &&
+                        (mode & TYPE) != 0 &&
+                        (mode & NOPARAMS) == 0) {
+                    mode = TYPE;
+                    checkGenerics();
+                    t = proxyArguments(false);
+                    break;
+                }
+                else {
+                    t = toP(F.at(pos).Ident(names.fromString("proxy")));
+                }
+            }
+            else{
+                t = toP(F.at(S.pos()).Ident(ident()));
+            }
+            
             loop: while (true) {
                 pos = S.pos();
                 switch (S.token()) {
@@ -1052,6 +1072,7 @@ public class JavacParser implements Parser {
             if (typeArgs != null) illegal();
             t = typeArgumentsOpt(t);
             break;
+        
         case BYTE: case SHORT: case CHAR: case INT: case LONG: case FLOAT:
         case DOUBLE: case BOOLEAN:
             if (typeArgs != null) illegal();
@@ -1077,6 +1098,7 @@ public class JavacParser implements Parser {
                 //return illegal();
             }
             break;
+        
         default:
             return illegal();
         }
@@ -1311,6 +1333,12 @@ public class JavacParser implements Parser {
         List<JCExpression> args = typeArguments(diamondAllowed);
         return toP(F.at(pos).TypeApply(t, args));
     }
+    
+    JCProxyApply proxyArguments(boolean diamondAllowed) {
+        int pos = S.pos();
+        List<JCExpression> args = typeArguments(diamondAllowed);
+        return toP(F.at(pos).ProxyApply(args));
+    }
 
     /** BracketsOpt = {"[" "]"}
      */
@@ -1369,6 +1397,30 @@ public class JavacParser implements Parser {
             if (typeArgs == null)
                 return arrayCreatorRest(newpos, basicType());
             break;
+        case PROXY:
+            S.nextToken();
+            int oldmode = mode;
+            mode = TYPE;
+            boolean diamondFound = false;
+            JCExpression t;
+            if (S.token() == LT) {
+                checkGenerics();
+                t = proxyArguments(true);
+            }
+            else{
+                return illegal();
+            }
+           
+            mode = oldmode;
+            if (S.token() == LPAREN) {
+                return classCreatorRest(newpos, null, typeArgs, t);
+            } else {
+                reportSyntaxError(S.pos(), "expected2",
+                                LPAREN, LBRACKET);
+                t = toP(F.at(newpos).NewClass(null, typeArgs, t, List.<JCExpression>nil(), null));
+                return toP(F.at(newpos).Erroneous(List.<JCTree>of(t)));
+            }
+            
         default:
         }
         JCExpression t = qualident();

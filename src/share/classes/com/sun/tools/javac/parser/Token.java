@@ -149,6 +149,7 @@ public enum Token implements Formattable {
     GTGTEQ(">>="),
     GTGTGTEQ(">>>="),
     MONKEYS_AT("@"),
+    PROXY("proxy"),
     CUSTOM;
 
     Token() {

@@ -1393,6 +1393,54 @@ public abstract class JCTree implements Tree, Cloneable, DiagnosticPosition {
         }
     }
 
+    public static class JCNewProxy extends JCNewClass implements NewClassTree {
+        public JCExpression encl;
+        public List<JCExpression> typeargs;
+        public JCExpression clazz;
+        public List<JCExpression> args;
+        public JCClassDecl def;
+        public Symbol constructor;
+        public Type varargsElement;
+        public Type constructorType;
+        protected JCNewProxy(JCExpression encl,
+                           List<JCExpression> typeargs,
+                           JCProxyApply clazz,
+                           List<JCExpression> args,
+                           JCClassDecl def)
+        {
+            super(encl, typeargs, encl, args, def);
+            this.encl = encl;
+            this.typeargs = (typeargs == null) ? List.<JCExpression>nil()
+                                               : typeargs;
+            this.clazz = clazz;
+            this.args = args;
+            this.def = def;
+        }
+        @Override
+        public void accept(Visitor v) { v.visitNewProxy(this); }
+
+        public Kind getKind() { return Kind.NEW_CLASS; }
+        public JCExpression getEnclosingExpression() { // expr.new C< ... > ( ... )
+            return encl;
+        }
+        public List<JCExpression> getTypeArguments() {
+            return typeargs;
+        }
+        public JCExpression getIdentifier() { return clazz; }
+        public List<JCExpression> getArguments() {
+            return args;
+        }
+        public JCClassDecl getClassBody() { return def; }
+        @Override
+        public <R,D> R accept(TreeVisitor<R,D> v, D d) {
+            return v.visitNewClass(this, d);
+        }
+        @Override
+        public int getTag() {
+            return NEWCLASS;
+        }
+    }
+    
     /**
      * A new[...] operation.
      */
@@ -1880,6 +1928,36 @@ public abstract class JCTree implements Tree, Cloneable, DiagnosticPosition {
         }
     }
 
+     /**
+     * A parameterized type, proxy<...>
+     */
+    public static class JCProxyApply extends JCExpression implements ParameterizedTypeTree {
+        public JCExpression clazz;
+        public List<JCExpression> arguments;
+        protected JCProxyApply(List<JCExpression> arguments) {
+            
+            this.arguments = arguments;
+        }
+        @Override
+        public void accept(Visitor v) {
+            v.visitProxyApply(this); 
+        }
+
+        public Kind getKind() { return Kind.PARAMETERIZED_TYPE; }
+        public JCTree getType() { return this; }
+        public List<JCExpression> getTypeArguments() {
+            return arguments;
+        }
+        @Override
+        public <R,D> R accept(TreeVisitor<R,D> v, D d) {
+            return v.visitParameterizedType(this, d);
+        }
+        @Override
+        public int getTag() {
+            return 9999;
+        }
+    }
+    
     /**
      * A union type, T1 | T2 | ... Tn (used in multicatch statements)
      */
@@ -2227,6 +2305,7 @@ public abstract class JCTree implements Tree, Cloneable, DiagnosticPosition {
         public void visitTypeIdent(JCPrimitiveTypeTree that) { visitTree(that); }
         public void visitTypeArray(JCArrayTypeTree that)     { visitTree(that); }
         public void visitTypeApply(JCTypeApply that)         { visitTree(that); }
+        public void visitProxyApply(JCProxyApply that)       { visitTree(that); }
         public void visitTypeUnion(JCTypeUnion that)         { visitTree(that); }
         public void visitTypeParameter(JCTypeParameter that) { visitTree(that); }
         public void visitWildcard(JCWildcard that)           { visitTree(that); }
@@ -2237,6 +2316,9 @@ public abstract class JCTree implements Tree, Cloneable, DiagnosticPosition {
         public void visitLetExpr(LetExpr that)               { visitTree(that); }
 
         public void visitTree(JCTree that)                   { Assert.error(); }
+
+        public void visitNewProxy(JCNewProxy that)           { visitTree(that);
+        }
     }
 
 }

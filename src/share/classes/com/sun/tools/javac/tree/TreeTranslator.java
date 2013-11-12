@@ -409,4 +409,8 @@ public class TreeTranslator extends JCTree.Visitor {
     public void visitTree(JCTree tree) {
         throw new AssertionError(tree);
     }
+    
+    public void visitProxyApply(JCProxyApply tree) {
+        result = tree;
+    }
 }

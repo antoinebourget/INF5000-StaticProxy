@@ -51,6 +51,7 @@ import com.sun.source.util.SimpleTreeVisitor;
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.code.Kinds.*;
 import static com.sun.tools.javac.code.TypeTags.*;
+import javax.lang.model.type.TypeKind;
 
 /** This is the main context-dependent analysis phase in GJC. It
  *  encompasses name resolution, type checking and constant folding as
@@ -2954,6 +2955,127 @@ public class Attr extends JCTree.Visitor {
             t = new UnionClassType((ClassType) t, alternatives);
         }
         tree.type = result = t;
+    }
+    
+     public void visitProxyApply(JCProxyApply tree) {
+        
+        ListBuffer<JCTree> defs = new ListBuffer<JCTree>();
+        // Attribute type parameters
+        List<Type> actuals = attribTypes(tree.arguments, env);
+        String name = "";
+        for (Type t : actuals) {
+            if (t != actuals.head) {
+                name += "$$";
+            }
+            name += t.toString().replace(".", "$");
+        }
+        name = "$proxy$" + name;
+        Symbol tsym;
+        if ((tsym = rs.findType(env, names.fromString(name))) instanceof Resolve.SymbolNotFoundError) {
+            ListBuffer<Type> params = new ListBuffer<Type>();
+            ListBuffer<Type> typarams = new ListBuffer<Type>();
+            ListBuffer<Type> thrown = new ListBuffer<Type>();
+            ListBuffer<JCStatement> stats = new ListBuffer<JCStatement>();
+            
+            params.add(actuals.head);
+            List<JCVariableDecl> methodParams = make.Params(params.toList(), syms.noSymbol);
+            
+            int mIndex = 0;
+            for (JCExpression t : tree.arguments) {
+                Name mName = names.fromString("x" + String.valueOf(mIndex));
+                JCTree member_var = make.VarDef(make.Modifiers(PRIVATE), mName, t, null);
+                
+                if (mIndex == 0) {
+                    JCExpressionStatement stat = make.Exec(make.Assign(make.Select(make.Ident(names._this), mName), make.Ident(methodParams.head)));
+                    stats.add(stat);
+                } else {
+                    JCExpressionStatement stat = make.Exec(make.Assign(make.Select(make.Ident(names._this), mName), make.TypeCast(t, make.Ident(methodParams.head))));
+                    stats.add(stat);
+                }
+                
+                defs.add(member_var);
+                mIndex++;
+            }
+            
+            JCTree ctor = make.MethodDef(
+                    make.Modifiers(PUBLIC),
+                    names.init,
+                    (JCExpression) null,
+                    make.TypeParams(typarams.toList()),
+                    methodParams,
+                    make.Types(thrown.toList()),
+                    make.Block(0, stats.toList()),
+                    (JCExpression) null);
+            defs.add(ctor);
+            
+            for (Type t : actuals) {
+                for (Symbol s : t.tsym.getEnclosedElements()) {
+                    if (s instanceof MethodSymbol) {
+                        MethodSymbol ms = (MethodSymbol) s;
+
+                        //List<TypeSymbol> typeParamSymbols = ms.getTypeParameters();
+                        ListBuffer<Type> typeParams = new ListBuffer<Type>();
+                        for (List<TypeSymbol> l = ms.getTypeParameters(); l.nonEmpty(); l = l.tail) {
+                            typeParams.append(l.head.asType());
+                        }
+                        ListBuffer<JCVariableDecl> paramVarSymbol = new ListBuffer<JCVariableDecl>();
+                        ListBuffer<JCExpression> methodArgs = new ListBuffer<JCExpression>();
+                        for (List<VarSymbol> l = ms.getParameters(); l.nonEmpty(); l = l.tail) {
+                            JCVariableDecl varDecl = make.VarDef(l.head, null);
+                            paramVarSymbol.append(varDecl);
+                            methodArgs.append(make.Ident(varDecl));
+                        }
+                        
+                        ListBuffer<JCStatement> proxyMethodStats = new ListBuffer<JCStatement>();
+                        String methodName = names._this.toString() + ".x" + String.valueOf(actuals.indexOf(t));
+                        
+                        if (ms.getReturnType().getKind() == TypeKind.VOID) {
+                            
+                            JCFieldAccess fieldAccess = make.Select(make.Ident(names.fromString(methodName)), ms.getSimpleName());
+                            fieldAccess.setType(ms.getReturnType());
+                            JCMethodInvocation methodInvocation = make.App(fieldAccess, methodArgs.toList());
+                            
+                            proxyMethodStats.append(make.Exec(methodInvocation));
+                            
+                            
+                            
+                        } else {
+                            JCFieldAccess fieldAccess = make.Select(make.Ident(names.fromString(methodName)), ms.getSimpleName());
+                            fieldAccess.setType(ms.getReturnType());
+                            JCMethodInvocation methodInvocation = make.App(fieldAccess, methodArgs.toList());
+                            
+                            proxyMethodStats.append(make.Return(methodInvocation));
+                            
+                        }
+                        
+                        
+                        JCTree proxyMethodDef = make.MethodDef(
+                                make.Modifiers(PUBLIC),
+                                ms.getSimpleName(),
+                                make.Type(ms.getReturnType()),
+                                make.TypeParams(typeParams.toList()),
+                                paramVarSymbol.toList(),
+                                make.Types(ms.getThrownTypes()),
+                                make.Block(0, proxyMethodStats.toList()),
+                                (JCExpression) null);
+                        defs.add(proxyMethodDef);
+                    }
+                    
+                }
+            }
+            
+            JCClassDecl clazzdef = make.ClassDef(make.Modifiers(0), names.fromString(name), make.TypeParams(typarams.toList()), null, tree.arguments, defs.toList());
+            //Env<AttrContext> localEnv = env.dup(tree, env.info.dup());
+
+            enter.classEnter(clazzdef, env);
+            //attribClass(clazzdef.sym);
+            //visitClassDef(clazzdef)
+            System.out.println(clazzdef.toString());
+            tsym = clazzdef.sym;
+        }
+        
+        result = check(tree, tsym.type, TYP, pkind, pt);
+        
     }
 
     public void visitTypeParameter(JCTypeParameter tree) {

@@ -1168,6 +1168,17 @@ public class Pretty extends JCTree.Visitor {
             throw new UncheckedIOException(e);
         }
     }
+    
+    public void visitProxyApply(JCProxyApply tree){
+        try{
+            
+            print("proxy<");
+            printExprs(tree.arguments);
+            print(">");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
 
     public void visitTypeUnion(JCTypeUnion tree) {
         try {

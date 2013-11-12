@@ -184,6 +184,16 @@ public class TreeMaker implements JCTree.Factory {
 
     public JCVariableDecl VarDef(JCModifiers mods, Name name, JCExpression vartype, JCExpression init) {
         JCVariableDecl tree = new JCVariableDecl(mods, name, vartype, init, null);
+        if (tree.getType() instanceof JCProxyApply) {
+            if (tree.getInitializer() != null){
+                 System.out.println("Static proxy initialized : " + tree.toString());
+            } 
+            else {
+                System.out.println("Static proxy declared : " + tree.toString());
+            }
+           
+            
+        }
         tree.pos = pos;
         return tree;
     }
@@ -431,6 +441,13 @@ public class TreeMaker implements JCTree.Factory {
 
     public JCTypeApply TypeApply(JCExpression clazz, List<JCExpression> arguments) {
         JCTypeApply tree = new JCTypeApply(clazz, arguments);
+        tree.pos = pos;
+        return tree;
+    }
+    
+    
+    public JCProxyApply ProxyApply(List<JCExpression> arguments) {
+        JCProxyApply tree = new JCProxyApply(arguments);
         tree.pos = pos;
         return tree;
     }
