@@ -22,7 +22,6 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-
 package com.sun.tools.javac.comp;
 
 import java.util.*;
@@ -44,23 +43,23 @@ import static com.sun.tools.javac.code.Kinds.*;
 import static com.sun.tools.javac.code.TypeTags.*;
 import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
 
-/** This is the second phase of Enter, in which classes are completed
- *  by entering their members into the class scope using
- *  MemberEnter.complete().  See Enter for an overview.
+/**
+ * This is the second phase of Enter, in which classes are completed by entering
+ * their members into the class scope using MemberEnter.complete(). See Enter
+ * for an overview.
  *
- *  <p><b>This is NOT part of any supported API.
- *  If you write code that depends on this, you do so at your own risk.
- *  This code and its internal interfaces are subject to change or
- *  deletion without notice.</b>
+ * <p><b>This is NOT part of any supported API. If you write code that depends
+ * on this, you do so at your own risk. This code and its internal interfaces
+ * are subject to change or deletion without notice.</b>
  */
 public class MemberEnter extends JCTree.Visitor implements Completer {
-    protected static final Context.Key<MemberEnter> memberEnterKey =
-        new Context.Key<MemberEnter>();
 
-    /** A switch to determine whether we check for package/class conflicts
+    protected static final Context.Key<MemberEnter> memberEnterKey =
+            new Context.Key<MemberEnter>();
+    /**
+     * A switch to determine whether we check for package/class conflicts
      */
     final static boolean checkClash = true;
-
     private final Names names;
     private final Enter enter;
     private final Log log;
@@ -75,13 +74,13 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
     private final JCDiagnostic.Factory diags;
     private final Target target;
     private final DeferredLintHandler deferredLintHandler;
-
     private final boolean skipAnnotations;
 
     public static MemberEnter instance(Context context) {
         MemberEnter instance = context.get(memberEnterKey);
-        if (instance == null)
+        if (instance == null) {
             instance = new MemberEnter(context);
+        }
         return instance;
     }
 
@@ -104,39 +103,39 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
         Options options = Options.instance(context);
         skipAnnotations = options.isSet("skipAnnotations");
     }
-
-    /** A queue for classes whose members still need to be entered into the
-     *  symbol table.
+    /**
+     * A queue for classes whose members still need to be entered into the
+     * symbol table.
      */
     ListBuffer<Env<AttrContext>> halfcompleted = new ListBuffer<Env<AttrContext>>();
-
-    /** Set to true only when the first of a set of classes is
-     *  processed from the halfcompleted queue.
+    /**
+     * Set to true only when the first of a set of classes is processed from the
+     * halfcompleted queue.
      */
     boolean isFirst = true;
-
-    /** A flag to disable completion from time to time during member
-     *  enter, as we only need to look up types.  This avoids
-     *  unnecessarily deep recursion.
+    /**
+     * A flag to disable completion from time to time during member enter, as we
+     * only need to look up types. This avoids unnecessarily deep recursion.
      */
     boolean completionEnabled = true;
 
-    /* ---------- Processing import clauses ----------------
+    /*
+     * ---------- Processing import clauses ----------------
      */
-
-    /** Import all classes of a class or package on demand.
-     *  @param pos           Position to be used for error reporting.
-     *  @param tsym          The class or package the members of which are imported.
-     *  @param toScope   The (import) scope in which imported classes
-     *               are entered.
+    /**
+     * Import all classes of a class or package on demand.
+     *
+     * @param pos Position to be used for error reporting.
+     * @param tsym The class or package the members of which are imported.
+     * @param toScope The (import) scope in which imported classes are entered.
      */
     private void importAll(int pos,
-                           final TypeSymbol tsym,
-                           Env<AttrContext> env) {
+            final TypeSymbol tsym,
+            Env<AttrContext> env) {
         // Check that packages imported from exist (JLS ???).
         if (tsym.kind == PCK && tsym.members().elems == null && !tsym.exists()) {
             // If we can't find java.lang, exit immediately.
-            if (((PackageSymbol)tsym).fullname.equals(names.java_lang)) {
+            if (((PackageSymbol) tsym).fullname.equals(names.java_lang)) {
                 JCDiagnostic msg = diags.fragment("fatal.err.no.java.lang");
                 throw new FatalError(msg);
             } else {
@@ -146,15 +145,16 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
         env.toplevel.starImportScope.importAll(tsym.members());
     }
 
-    /** Import all static members of a class or package on demand.
-     *  @param pos           Position to be used for error reporting.
-     *  @param tsym          The class or package the members of which are imported.
-     *  @param toScope   The (import) scope in which imported classes
-     *               are entered.
+    /**
+     * Import all static members of a class or package on demand.
+     *
+     * @param pos Position to be used for error reporting.
+     * @param tsym The class or package the members of which are imported.
+     * @param toScope The (import) scope in which imported classes are entered.
      */
     private void importStaticAll(int pos,
-                                 final TypeSymbol tsym,
-                                 Env<AttrContext> env) {
+            final TypeSymbol tsym,
+            Env<AttrContext> env) {
         final JavaFileObject sourcefile = env.toplevel.sourcefile;
         final Scope toScope = env.toplevel.starImportScope;
         final PackageSymbol packge = env.toplevel.packge;
@@ -162,56 +162,66 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
 
         // enter imported types immediately
         new Object() {
+
             Set<Symbol> processed = new HashSet<Symbol>();
+
             void importFrom(TypeSymbol tsym) {
-                if (tsym == null || !processed.add(tsym))
+                if (tsym == null || !processed.add(tsym)) {
                     return;
+                }
 
                 // also import inherited names
                 importFrom(types.supertype(tsym.type).tsym);
-                for (Type t : types.interfaces(tsym.type))
+                for (Type t : types.interfaces(tsym.type)) {
                     importFrom(t.tsym);
+                }
 
                 final Scope fromScope = tsym.members();
                 for (Scope.Entry e = fromScope.elems; e != null; e = e.sibling) {
                     Symbol sym = e.sym;
-                    if (sym.kind == TYP &&
-                        (sym.flags() & STATIC) != 0 &&
-                        staticImportAccessible(sym, packge) &&
-                        sym.isMemberOf(origin, types) &&
-                        !toScope.includes(sym))
+                    if (sym.kind == TYP
+                            && (sym.flags() & STATIC) != 0
+                            && staticImportAccessible(sym, packge)
+                            && sym.isMemberOf(origin, types)
+                            && !toScope.includes(sym)) {
                         toScope.enter(sym, fromScope, origin.members());
+                    }
                 }
             }
         }.importFrom(tsym);
 
         // enter non-types before annotations that might use them
         annotate.earlier(new Annotate.Annotator() {
+
             Set<Symbol> processed = new HashSet<Symbol>();
 
             public String toString() {
                 return "import static " + tsym + ".*" + " in " + sourcefile;
             }
+
             void importFrom(TypeSymbol tsym) {
-                if (tsym == null || !processed.add(tsym))
+                if (tsym == null || !processed.add(tsym)) {
                     return;
+                }
 
                 // also import inherited names
                 importFrom(types.supertype(tsym.type).tsym);
-                for (Type t : types.interfaces(tsym.type))
+                for (Type t : types.interfaces(tsym.type)) {
                     importFrom(t.tsym);
+                }
 
                 final Scope fromScope = tsym.members();
                 for (Scope.Entry e = fromScope.elems; e != null; e = e.sibling) {
                     Symbol sym = e.sym;
-                    if (sym.isStatic() && sym.kind != TYP &&
-                        staticImportAccessible(sym, packge) &&
-                        !toScope.includes(sym) &&
-                        sym.isMemberOf(origin, types)) {
+                    if (sym.isStatic() && sym.kind != TYP
+                            && staticImportAccessible(sym, packge)
+                            && !toScope.includes(sym)
+                            && sym.isMemberOf(origin, types)) {
                         toScope.enter(sym, fromScope, origin.members());
                     }
                 }
             }
+
             public void enterAnnotation() {
                 importFrom(tsym);
             }
@@ -220,30 +230,31 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
 
     // is the sym accessible everywhere in packge?
     boolean staticImportAccessible(Symbol sym, PackageSymbol packge) {
-        int flags = (int)(sym.flags() & AccessFlags);
+        int flags = (int) (sym.flags() & AccessFlags);
         switch (flags) {
-        default:
-        case PUBLIC:
-            return true;
-        case PRIVATE:
-            return false;
-        case 0:
-        case PROTECTED:
-            return sym.packge() == packge;
+            default:
+            case PUBLIC:
+                return true;
+            case PRIVATE:
+                return false;
+            case 0:
+            case PROTECTED:
+                return sym.packge() == packge;
         }
     }
 
-    /** Import statics types of a given name.  Non-types are handled in Attr.
-     *  @param pos           Position to be used for error reporting.
-     *  @param tsym          The class from which the name is imported.
-     *  @param name          The (simple) name being imported.
-     *  @param env           The environment containing the named import
-     *                  scope to add to.
+    /**
+     * Import statics types of a given name. Non-types are handled in Attr.
+     *
+     * @param pos Position to be used for error reporting.
+     * @param tsym The class from which the name is imported.
+     * @param name The (simple) name being imported.
+     * @param env The environment containing the named import scope to add to.
      */
     private void importNamedStatic(final DiagnosticPosition pos,
-                                   final TypeSymbol tsym,
-                                   final Name name,
-                                   final Env<AttrContext> env) {
+            final TypeSymbol tsym,
+            final Name name,
+            final Env<AttrContext> env) {
         if (tsym.kind != TYP) {
             log.error(pos, "static.imp.only.classes.and.interfaces");
             return;
@@ -255,71 +266,82 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
 
         // enter imported types immediately
         new Object() {
+
             Set<Symbol> processed = new HashSet<Symbol>();
+
             void importFrom(TypeSymbol tsym) {
-                if (tsym == null || !processed.add(tsym))
+                if (tsym == null || !processed.add(tsym)) {
                     return;
+                }
 
                 // also import inherited names
                 importFrom(types.supertype(tsym.type).tsym);
-                for (Type t : types.interfaces(tsym.type))
+                for (Type t : types.interfaces(tsym.type)) {
                     importFrom(t.tsym);
+                }
 
                 for (Scope.Entry e = tsym.members().lookup(name);
-                     e.scope != null;
-                     e = e.next()) {
+                        e.scope != null;
+                        e = e.next()) {
                     Symbol sym = e.sym;
-                    if (sym.isStatic() &&
-                        sym.kind == TYP &&
-                        staticImportAccessible(sym, packge) &&
-                        sym.isMemberOf(origin, types) &&
-                        chk.checkUniqueStaticImport(pos, sym, toScope))
+                    if (sym.isStatic()
+                            && sym.kind == TYP
+                            && staticImportAccessible(sym, packge)
+                            && sym.isMemberOf(origin, types)
+                            && chk.checkUniqueStaticImport(pos, sym, toScope)) {
                         toScope.enter(sym, sym.owner.members(), origin.members());
+                    }
                 }
             }
         }.importFrom(tsym);
 
         // enter non-types before annotations that might use them
         annotate.earlier(new Annotate.Annotator() {
+
             Set<Symbol> processed = new HashSet<Symbol>();
             boolean found = false;
 
             public String toString() {
                 return "import static " + tsym + "." + name;
             }
+
             void importFrom(TypeSymbol tsym) {
-                if (tsym == null || !processed.add(tsym))
+                if (tsym == null || !processed.add(tsym)) {
                     return;
+                }
 
                 // also import inherited names
                 importFrom(types.supertype(tsym.type).tsym);
-                for (Type t : types.interfaces(tsym.type))
+                for (Type t : types.interfaces(tsym.type)) {
                     importFrom(t.tsym);
+                }
 
                 for (Scope.Entry e = tsym.members().lookup(name);
-                     e.scope != null;
-                     e = e.next()) {
+                        e.scope != null;
+                        e = e.next()) {
                     Symbol sym = e.sym;
-                    if (sym.isStatic() &&
-                        staticImportAccessible(sym, packge) &&
-                        sym.isMemberOf(origin, types)) {
+                    if (sym.isStatic()
+                            && staticImportAccessible(sym, packge)
+                            && sym.isMemberOf(origin, types)) {
                         found = true;
-                        if (sym.kind == MTH ||
-                            sym.kind != TYP && chk.checkUniqueStaticImport(pos, sym, toScope))
+                        if (sym.kind == MTH
+                                || sym.kind != TYP && chk.checkUniqueStaticImport(pos, sym, toScope)) {
                             toScope.enter(sym, sym.owner.members(), origin.members());
+                        }
                     }
                 }
             }
+
             public void enterAnnotation() {
                 JavaFileObject prev = log.useSource(env.toplevel.sourcefile);
                 try {
                     importFrom(tsym);
                     if (!found) {
                         log.error(pos, "cant.resolve.location",
-                                  KindName.STATIC,
-                                  name, List.<Type>nil(), List.<Type>nil(),
-                                  Kinds.typeKindName(tsym.type),
-                                  tsym.type);
+                                KindName.STATIC,
+                                name, List.<Type>nil(), List.<Type>nil(),
+                                Kinds.typeKindName(tsym.type),
+                                tsym.type);
                     }
                 } finally {
                     log.useSource(prev);
@@ -327,31 +349,35 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             }
         });
     }
-    /** Import given class.
-     *  @param pos           Position to be used for error reporting.
-     *  @param tsym          The class to be imported.
-     *  @param env           The environment containing the named import
-     *                  scope to add to.
+
+    /**
+     * Import given class.
+     *
+     * @param pos Position to be used for error reporting.
+     * @param tsym The class to be imported.
+     * @param env The environment containing the named import scope to add to.
      */
     private void importNamed(DiagnosticPosition pos, Symbol tsym, Env<AttrContext> env) {
-        if (tsym.kind == TYP &&
-            chk.checkUniqueImport(pos, tsym, env.toplevel.namedImportScope))
+        if (tsym.kind == TYP
+                && chk.checkUniqueImport(pos, tsym, env.toplevel.namedImportScope)) {
             env.toplevel.namedImportScope.enter(tsym, tsym.owner.members());
+        }
     }
 
-    /** Construct method type from method signature.
-     *  @param typarams    The method's type parameters.
-     *  @param params      The method's value parameters.
-     *  @param res             The method's result type,
-     *                 null if it is a constructor.
-     *  @param thrown      The method's thrown exceptions.
-     *  @param env             The method's (local) environment.
+    /**
+     * Construct method type from method signature.
+     *
+     * @param typarams The method's type parameters.
+     * @param params The method's value parameters.
+     * @param res The method's result type, null if it is a constructor.
+     * @param thrown The method's thrown exceptions.
+     * @param env The method's (local) environment.
      */
     Type signature(List<JCTypeParameter> typarams,
-                   List<JCVariableDecl> params,
-                   JCTree res,
-                   List<JCExpression> thrown,
-                   Env<AttrContext> env) {
+            List<JCVariableDecl> params,
+            JCTree res,
+            List<JCExpression> thrown,
+            Env<AttrContext> env) {
 
         // Enter and attribute type parameters.
         List<Type> tvars = enter.classEnter(typarams, env);
@@ -371,125 +397,130 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
         ListBuffer<Type> thrownbuf = new ListBuffer<Type>();
         for (List<JCExpression> l = thrown; l.nonEmpty(); l = l.tail) {
             Type exc = attr.attribType(l.head, env);
-            if (exc.tag != TYPEVAR)
+            if (exc.tag != TYPEVAR) {
                 exc = chk.checkClassType(l.head.pos(), exc);
+            }
             thrownbuf.append(exc);
         }
         Type mtype = new MethodType(argbuf.toList(),
-                                    restype,
-                                    thrownbuf.toList(),
-                                    syms.methodClass);
+                restype,
+                thrownbuf.toList(),
+                syms.methodClass);
         return tvars.isEmpty() ? mtype : new ForAll(tvars, mtype);
     }
 
-/* ********************************************************************
- * Visitor methods for member enter
- *********************************************************************/
-
-    /** Visitor argument: the current environment
+    /*
+     * ********************************************************************
+     * Visitor methods for member enter
+ ********************************************************************
+     */
+    /**
+     * Visitor argument: the current environment
      */
     protected Env<AttrContext> env;
 
-    /** Enter field and method definitions and process import
-     *  clauses, catching any completion failure exceptions.
+    /**
+     * Enter field and method definitions and process import clauses, catching
+     * any completion failure exceptions.
      */
     protected void memberEnter(JCTree tree, Env<AttrContext> env) {
         Env<AttrContext> prevEnv = this.env;
         try {
             this.env = env;
             tree.accept(this);
-        }  catch (CompletionFailure ex) {
+        } catch (CompletionFailure ex) {
             chk.completionError(tree.pos(), ex);
         } finally {
             this.env = prevEnv;
         }
     }
 
-    /** Enter members from a list of trees.
+    /**
+     * Enter members from a list of trees.
      */
     void memberEnter(List<? extends JCTree> trees, Env<AttrContext> env) {
-        for (List<? extends JCTree> l = trees; l.nonEmpty(); l = l.tail)
+        for (List<? extends JCTree> l = trees; l.nonEmpty(); l = l.tail) {
             memberEnter(l.head, env);
+        }
     }
 
-    /** Enter members for a class.
+    /**
+     * Enter members for a class.
      */
     void finishClass(JCClassDecl tree, Env<AttrContext> env) {
-        if ((tree.mods.flags & Flags.ENUM) != 0 &&
-            (types.supertype(tree.sym.type).tsym.flags() & Flags.ENUM) == 0) {
+        if ((tree.mods.flags & Flags.ENUM) != 0
+                && (types.supertype(tree.sym.type).tsym.flags() & Flags.ENUM) == 0) {
             addEnumMembers(tree, env);
         }
         memberEnter(tree.defs, env);
     }
 
-    /** Add the implicit members for an enum type
-     *  to the symbol table.
+    /**
+     * Add the implicit members for an enum type to the symbol table.
      */
     private void addEnumMembers(JCClassDecl tree, Env<AttrContext> env) {
         JCExpression valuesType = make.Type(new ArrayType(tree.sym.type, syms.arrayClass));
 
         // public static T[] values() { return ???; }
-        JCMethodDecl values = make.
-            MethodDef(make.Modifiers(Flags.PUBLIC|Flags.STATIC),
-                      names.values,
-                      valuesType,
-                      List.<JCTypeParameter>nil(),
-                      List.<JCVariableDecl>nil(),
-                      List.<JCExpression>nil(), // thrown
-                      null, //make.Block(0, Tree.emptyList.prepend(make.Return(make.Ident(names._null)))),
-                      null);
+        JCMethodDecl values = make.MethodDef(make.Modifiers(Flags.PUBLIC | Flags.STATIC),
+                names.values,
+                valuesType,
+                List.<JCTypeParameter>nil(),
+                List.<JCVariableDecl>nil(),
+                List.<JCExpression>nil(), // thrown
+                null, //make.Block(0, Tree.emptyList.prepend(make.Return(make.Ident(names._null)))),
+                null);
         memberEnter(values, env);
 
         // public static T valueOf(String name) { return ???; }
-        JCMethodDecl valueOf = make.
-            MethodDef(make.Modifiers(Flags.PUBLIC|Flags.STATIC),
-                      names.valueOf,
-                      make.Type(tree.sym.type),
-                      List.<JCTypeParameter>nil(),
-                      List.of(make.VarDef(make.Modifiers(Flags.PARAMETER),
-                                            names.fromString("name"),
-                                            make.Type(syms.stringType), null)),
-                      List.<JCExpression>nil(), // thrown
-                      null, //make.Block(0, Tree.emptyList.prepend(make.Return(make.Ident(names._null)))),
-                      null);
+        JCMethodDecl valueOf = make.MethodDef(make.Modifiers(Flags.PUBLIC | Flags.STATIC),
+                names.valueOf,
+                make.Type(tree.sym.type),
+                List.<JCTypeParameter>nil(),
+                List.of(make.VarDef(make.Modifiers(Flags.PARAMETER),
+                names.fromString("name"),
+                make.Type(syms.stringType), null)),
+                List.<JCExpression>nil(), // thrown
+                null, //make.Block(0, Tree.emptyList.prepend(make.Return(make.Ident(names._null)))),
+                null);
         memberEnter(valueOf, env);
 
         // the remaining members are for bootstrapping only
-        if (!target.compilerBootstrap(tree.sym)) return;
+        if (!target.compilerBootstrap(tree.sym)) {
+            return;
+        }
 
         // public final int ordinal() { return ???; }
         JCMethodDecl ordinal = make.at(tree.pos).
-            MethodDef(make.Modifiers(Flags.PUBLIC|Flags.FINAL),
-                      names.ordinal,
-                      make.Type(syms.intType),
-                      List.<JCTypeParameter>nil(),
-                      List.<JCVariableDecl>nil(),
-                      List.<JCExpression>nil(),
-                      null,
-                      null);
+                MethodDef(make.Modifiers(Flags.PUBLIC | Flags.FINAL),
+                names.ordinal,
+                make.Type(syms.intType),
+                List.<JCTypeParameter>nil(),
+                List.<JCVariableDecl>nil(),
+                List.<JCExpression>nil(),
+                null,
+                null);
         memberEnter(ordinal, env);
 
         // public final String name() { return ???; }
-        JCMethodDecl name = make.
-            MethodDef(make.Modifiers(Flags.PUBLIC|Flags.FINAL),
-                      names._name,
-                      make.Type(syms.stringType),
-                      List.<JCTypeParameter>nil(),
-                      List.<JCVariableDecl>nil(),
-                      List.<JCExpression>nil(),
-                      null,
-                      null);
+        JCMethodDecl name = make.MethodDef(make.Modifiers(Flags.PUBLIC | Flags.FINAL),
+                names._name,
+                make.Type(syms.stringType),
+                List.<JCTypeParameter>nil(),
+                List.<JCVariableDecl>nil(),
+                List.<JCExpression>nil(),
+                null,
+                null);
         memberEnter(name, env);
 
         // public int compareTo(E other) { return ???; }
-        MethodSymbol compareTo = new
-            MethodSymbol(Flags.PUBLIC,
-                         names.compareTo,
-                         new MethodType(List.of(tree.sym.type),
-                                        syms.intType,
-                                        List.<Type>nil(),
-                                        syms.methodClass),
-                         tree.sym);
+        MethodSymbol compareTo = new MethodSymbol(Flags.PUBLIC,
+                names.compareTo,
+                new MethodType(List.of(tree.sym.type),
+                syms.intType,
+                List.<Type>nil(),
+                syms.methodClass),
+                tree.sym);
         memberEnter(make.MethodDef(compareTo, null), env);
     }
 
@@ -507,8 +538,8 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
                 p.owner.complete(); // enter all class members of p
                 if (syms.classes.get(p.getQualifiedName()) != null) {
                     log.error(tree.pos,
-                              "pkg.clashes.with.class.of.same.name",
-                              p);
+                            "pkg.clashes.with.class.of.same.name",
+                            p);
                 }
                 p = p.owner;
             }
@@ -536,18 +567,18 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
 
         // Attribute qualifying package or class.
         JCFieldAccess s = (JCFieldAccess) imp;
-        p = attr.
-            attribTree(s.selected,
-                       localEnv,
-                       tree.staticImport ? TYP : (TYP | PCK),
-                       Type.noType).tsym;
+        p = attr.attribTree(s.selected,
+                localEnv,
+                tree.staticImport ? TYP : (TYP | PCK),
+                Type.noType).tsym;
         if (name == names.asterisk) {
             // Import on demand.
             chk.checkCanonical(s.selected);
-            if (tree.staticImport)
+            if (tree.staticImport) {
                 importStaticAll(tree.pos, p, env);
-            else
+            } else {
                 importAll(tree.pos, p, env);
+            }
         } else {
             // Named type import.
             if (tree.staticImport) {
@@ -573,8 +604,8 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
         try {
             // Compute the method type
             m.type = signature(tree.typarams, tree.params,
-                               tree.restype, tree.thrown,
-                               localEnv);
+                    tree.restype, tree.thrown,
+                    localEnv);
         } finally {
             chk.setDeferredLintHandler(prevLintHandler);
         }
@@ -589,35 +620,41 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
         m.params = params.toList();
 
         // mark the method varargs, if necessary
-        if (lastParam != null && (lastParam.mods.flags & Flags.VARARGS) != 0)
+        if (lastParam != null && (lastParam.mods.flags & Flags.VARARGS) != 0) {
             m.flags_field |= Flags.VARARGS;
+        }
 
         localEnv.info.scope.leave();
         if (chk.checkUnique(tree.pos(), m, enclScope)) {
             enclScope.enter(m);
         }
         annotateLater(tree.mods.annotations, localEnv, m);
-        if (tree.defaultValue != null)
+        if (tree.defaultValue != null) {
             annotateDefaultValueLater(tree.defaultValue, localEnv, m);
+        }
     }
 
-    /** Create a fresh environment for method bodies.
-     *  @param tree     The method definition.
-     *  @param env      The environment current outside of the method definition.
+    /**
+     * Create a fresh environment for method bodies.
+     *
+     * @param tree The method definition.
+     * @param env The environment current outside of the method definition.
      */
     Env<AttrContext> methodEnv(JCMethodDecl tree, Env<AttrContext> env) {
         Env<AttrContext> localEnv =
-            env.dup(tree, env.info.dup(env.info.scope.dupUnshared()));
+                env.dup(tree, env.info.dup(env.info.scope.dupUnshared()));
         localEnv.enclMethod = tree;
         localEnv.info.scope.owner = tree.sym;
-        if ((tree.mods.flags & STATIC) != 0) localEnv.info.staticLevel++;
+        if ((tree.mods.flags & STATIC) != 0) {
+            localEnv.info.staticLevel++;
+        }
         return localEnv;
     }
 
     public void visitVarDef(JCVariableDecl tree) {
         Env<AttrContext> localEnv = env;
-        if ((tree.mods.flags & STATIC) != 0 ||
-            (env.info.scope.owner.flags() & INTERFACE) != 0) {
+        if ((tree.mods.flags & STATIC) != 0
+                || (env.info.scope.owner.flags() & INTERFACE) != 0) {
             localEnv = env.dup(tree, env.info.dup());
             localEnv.info.staticLevel++;
         }
@@ -634,12 +671,12 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             //(a plain array type) with the more precise VarargsType --- we need
             //to do it this way because varargs is represented in the tree as a modifier
             //on the parameter declaration, and not as a distinct type of array node.
-            ArrayType atype = (ArrayType)tree.vartype.type;
+            ArrayType atype = (ArrayType) tree.vartype.type;
             tree.vartype.type = atype.makeVarargs();
         }
         Scope enclScope = enter.enterScope(env);
         VarSymbol v =
-            new VarSymbol(0, tree.name, tree.vartype.type, enclScope.owner);
+                new VarSymbol(0, tree.name, tree.vartype.type, enclScope.owner);
         v.flags_field = chk.checkFlags(tree.pos(), tree.mods.flags, v, tree);
         tree.sym = v;
         if (tree.init != null) {
@@ -658,13 +695,14 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
         v.pos = tree.pos;
     }
 
-    /** Create a fresh environment for a variable's initializer.
-     *  If the variable is a field, the owner of the environment's scope
-     *  is be the variable itself, otherwise the owner is the method
-     *  enclosing the variable definition.
+    /**
+     * Create a fresh environment for a variable's initializer. If the variable
+     * is a field, the owner of the environment's scope is be the variable
+     * itself, otherwise the owner is the method enclosing the variable
+     * definition.
      *
-     *  @param tree     The variable definition.
-     *  @param env      The environment current outside of the variable definition.
+     * @param tree The variable definition.
+     * @param env The environment current outside of the variable definition.
      */
     Env<AttrContext> initEnv(JCVariableDecl tree, Env<AttrContext> env) {
         Env<AttrContext> localEnv = env.dupto(new AttrContextEnv(tree, env.info.dup()));
@@ -672,29 +710,34 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             localEnv.info.scope = new Scope.DelegatedScope(env.info.scope);
             localEnv.info.scope.owner = tree.sym;
         }
-        if ((tree.mods.flags & STATIC) != 0 ||
-            (env.enclClass.sym.flags() & INTERFACE) != 0)
+        if ((tree.mods.flags & STATIC) != 0
+                || (env.enclClass.sym.flags() & INTERFACE) != 0) {
             localEnv.info.staticLevel++;
+        }
         return localEnv;
     }
 
-    /** Default member enter visitor method: do nothing
+    /**
+     * Default member enter visitor method: do nothing
      */
     public void visitTree(JCTree tree) {
     }
 
     public void visitErroneous(JCErroneous tree) {
-        if (tree.errs != null)
+        if (tree.errs != null) {
             memberEnter(tree.errs, env);
+        }
     }
 
     public Env<AttrContext> getMethodEnv(JCMethodDecl tree, Env<AttrContext> env) {
         Env<AttrContext> mEnv = methodEnv(tree, env);
         mEnv.info.lint = mEnv.info.lint.augment(tree.sym.attributes_field, tree.sym.flags());
-        for (List<JCTypeParameter> l = tree.typarams; l.nonEmpty(); l = l.tail)
+        for (List<JCTypeParameter> l = tree.typarams; l.nonEmpty(); l = l.tail) {
             mEnv.info.scope.enterIfAbsent(l.head.type.tsym);
-        for (List<JCVariableDecl> l = tree.params; l.nonEmpty(); l = l.tail)
+        }
+        for (List<JCVariableDecl> l = tree.params; l.nonEmpty(); l = l.tail) {
             mEnv.info.scope.enterIfAbsent(l.head.sym);
+        }
         return mEnv;
     }
 
@@ -703,10 +746,11 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
         return iEnv;
     }
 
-/* ********************************************************************
- * Type completion
- *********************************************************************/
-
+    /*
+     * ********************************************************************
+     * Type completion
+ ********************************************************************
+     */
     Type attribImportType(JCTree tree, Env<AttrContext> env) {
         Assert.check(completionEnabled);
         try {
@@ -719,127 +763,154 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
         }
     }
 
-/* ********************************************************************
- * Annotation processing
- *********************************************************************/
-
-    /** Queue annotations for later processing. */
+    /*
+     * ********************************************************************
+     * Annotation processing
+ ********************************************************************
+     */
+    /**
+     * Queue annotations for later processing.
+     */
     void annotateLater(final List<JCAnnotation> annotations,
-                       final Env<AttrContext> localEnv,
-                       final Symbol s) {
-        if (annotations.isEmpty()) return;
-        if (s.kind != PCK) s.attributes_field = null; // mark it incomplete for now
+            final Env<AttrContext> localEnv,
+            final Symbol s) {
+        if (annotations.isEmpty()) {
+            return;
+        }
+        if (s.kind != PCK) {
+            s.attributes_field = null; // mark it incomplete for now
+        }
         annotate.later(new Annotate.Annotator() {
-                public String toString() {
-                    return "annotate " + annotations + " onto " + s + " in " + s.owner;
-                }
-                public void enterAnnotation() {
-                    Assert.check(s.kind == PCK || s.attributes_field == null);
-                    JavaFileObject prev = log.useSource(localEnv.toplevel.sourcefile);
-                    try {
-                        if (s.attributes_field != null &&
-                            s.attributes_field.nonEmpty() &&
-                            annotations.nonEmpty())
-                            log.error(annotations.head.pos,
-                                      "already.annotated",
-                                      kindName(s), s);
-                        enterAnnotations(annotations, localEnv, s);
-                    } finally {
-                        log.useSource(prev);
+
+            public String toString() {
+                return "annotate " + annotations + " onto " + s + " in " + s.owner;
+            }
+
+            public void enterAnnotation() {
+                Assert.check(s.kind == PCK || s.attributes_field == null);
+                JavaFileObject prev = log.useSource(localEnv.toplevel.sourcefile);
+                try {
+                    if (s.attributes_field != null
+                            && s.attributes_field.nonEmpty()
+                            && annotations.nonEmpty()) {
+                        log.error(annotations.head.pos,
+                                "already.annotated",
+                                kindName(s), s);
                     }
+                    enterAnnotations(annotations, localEnv, s);
+                } finally {
+                    log.useSource(prev);
                 }
-            });
+            }
+        });
     }
 
     /**
      * Check if a list of annotations contains a reference to
      * java.lang.Deprecated.
-     **/
+     *
+     */
     private boolean hasDeprecatedAnnotation(List<JCAnnotation> annotations) {
         for (List<JCAnnotation> al = annotations; al.nonEmpty(); al = al.tail) {
             JCAnnotation a = al.head;
-            if (a.annotationType.type == syms.deprecatedType && a.args.isEmpty())
+            if (a.annotationType.type == syms.deprecatedType && a.args.isEmpty()) {
                 return true;
+            }
         }
         return false;
     }
 
-
-    /** Enter a set of annotations. */
+    /**
+     * Enter a set of annotations.
+     */
     private void enterAnnotations(List<JCAnnotation> annotations,
-                          Env<AttrContext> env,
-                          Symbol s) {
+            Env<AttrContext> env,
+            Symbol s) {
         ListBuffer<Attribute.Compound> buf =
-            new ListBuffer<Attribute.Compound>();
+                new ListBuffer<Attribute.Compound>();
         Set<TypeSymbol> annotated = new HashSet<TypeSymbol>();
-        if (!skipAnnotations)
-        for (List<JCAnnotation> al = annotations; al.nonEmpty(); al = al.tail) {
-            JCAnnotation a = al.head;
-            Attribute.Compound c = annotate.enterAnnotation(a,
-                                                            syms.annotationType,
-                                                            env);
-            if (c == null) continue;
-            buf.append(c);
-            // Note: @Deprecated has no effect on local variables and parameters
-            if (!c.type.isErroneous()
-                && s.owner.kind != MTH
-                && types.isSameType(c.type, syms.deprecatedType))
-                s.flags_field |= Flags.DEPRECATED;
-            // Internally to java.lang.invoke, a @PolymorphicSignature annotation
-            // acts like a classfile attribute.
-            if (!c.type.isErroneous() &&
-                types.isSameType(c.type, syms.polymorphicSignatureType)) {
-                if (!target.hasMethodHandles()) {
-                    // Somebody is compiling JDK7 source code to a JDK6 target.
-                    // Make it an error, since it is unlikely but important.
-                    log.error(env.tree.pos(),
-                            "wrong.target.for.polymorphic.signature.definition",
-                            target.name);
+        if (!skipAnnotations) {
+            for (List<JCAnnotation> al = annotations; al.nonEmpty(); al = al.tail) {
+                JCAnnotation a = al.head;
+                Attribute.Compound c = annotate.enterAnnotation(a,
+                        syms.annotationType,
+                        env);
+                if (c == null) {
+                    continue;
                 }
-                // Pull the flag through for better diagnostics, even on a bad target.
-                s.flags_field |= Flags.POLYMORPHIC_SIGNATURE;
+                buf.append(c);
+                // Note: @Deprecated has no effect on local variables and parameters
+                if (!c.type.isErroneous()
+                        && s.owner.kind != MTH
+                        && types.isSameType(c.type, syms.deprecatedType)) {
+                    s.flags_field |= Flags.DEPRECATED;
+                }
+                // Internally to java.lang.invoke, a @PolymorphicSignature annotation
+                // acts like a classfile attribute.
+                if (!c.type.isErroneous()
+                        && types.isSameType(c.type, syms.polymorphicSignatureType)) {
+                    if (!target.hasMethodHandles()) {
+                        // Somebody is compiling JDK7 source code to a JDK6 target.
+                        // Make it an error, since it is unlikely but important.
+                        log.error(env.tree.pos(),
+                                "wrong.target.for.polymorphic.signature.definition",
+                                target.name);
+                    }
+                    // Pull the flag through for better diagnostics, even on a bad target.
+                    s.flags_field |= Flags.POLYMORPHIC_SIGNATURE;
+                }
+                if (!annotated.add(a.type.tsym)) {
+                    log.error(a.pos, "duplicate.annotation");
+                }
             }
-            if (!annotated.add(a.type.tsym))
-                log.error(a.pos, "duplicate.annotation");
         }
         s.attributes_field = buf.toList();
     }
 
-    /** Queue processing of an attribute default value. */
+    /**
+     * Queue processing of an attribute default value.
+     */
     void annotateDefaultValueLater(final JCExpression defaultValue,
-                                   final Env<AttrContext> localEnv,
-                                   final MethodSymbol m) {
+            final Env<AttrContext> localEnv,
+            final MethodSymbol m) {
         annotate.later(new Annotate.Annotator() {
-                public String toString() {
-                    return "annotate " + m.owner + "." +
-                        m + " default " + defaultValue;
+
+            public String toString() {
+                return "annotate " + m.owner + "."
+                        + m + " default " + defaultValue;
+            }
+
+            public void enterAnnotation() {
+                JavaFileObject prev = log.useSource(localEnv.toplevel.sourcefile);
+                try {
+                    enterDefaultValue(defaultValue, localEnv, m);
+                } finally {
+                    log.useSource(prev);
                 }
-                public void enterAnnotation() {
-                    JavaFileObject prev = log.useSource(localEnv.toplevel.sourcefile);
-                    try {
-                        enterDefaultValue(defaultValue, localEnv, m);
-                    } finally {
-                        log.useSource(prev);
-                    }
-                }
-            });
+            }
+        });
     }
 
-    /** Enter a default value for an attribute method. */
+    /**
+     * Enter a default value for an attribute method.
+     */
     private void enterDefaultValue(final JCExpression defaultValue,
-                                   final Env<AttrContext> localEnv,
-                                   final MethodSymbol m) {
+            final Env<AttrContext> localEnv,
+            final MethodSymbol m) {
         m.defaultValue = annotate.enterAttributeValue(m.type.getReturnType(),
-                                                      defaultValue,
-                                                      localEnv);
+                defaultValue,
+                localEnv);
     }
 
-/* ********************************************************************
- * Source completer
- *********************************************************************/
-
-    /** Complete entering a class.
-     *  @param sym         The symbol of the class to be completed.
+    /*
+     * ********************************************************************
+     * Source completer
+ ********************************************************************
+     */
+    /**
+     * Complete entering a class.
+     *
+     * @param sym The symbol of the class to be completed.
      */
     public void complete(Symbol sym) throws CompletionFailure {
         // Suppress some (recursive) MemberEnter invocations
@@ -850,10 +921,10 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             return;
         }
 
-        ClassSymbol c = (ClassSymbol)sym;
-        ClassType ct = (ClassType)c.type;
+        ClassSymbol c = (ClassSymbol) sym;
+        ClassType ct = (ClassType) c.type;
         Env<AttrContext> env = enter.typeEnvs.get(c);
-        JCClassDecl tree = (JCClassDecl)env.tree;
+        JCClassDecl tree = (JCClassDecl) env.tree;
         boolean wasFirst = isFirst;
         isFirst = false;
 
@@ -872,22 +943,23 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
                 todo.append(env);
             }
 
-            if (c.owner.kind == TYP)
+            if (c.owner.kind == TYP) {
                 c.owner.complete();
+            }
 
             // create an environment for evaluating the base clauses
             Env<AttrContext> baseEnv = baseEnv(tree, env);
 
             // Determine supertype.
             Type supertype =
-                (tree.extending != null)
-                ? attr.attribBase(tree.extending, baseEnv, true, false, true)
-                : ((tree.mods.flags & Flags.ENUM) != 0 && !target.compilerBootstrap(c))
-                ? attr.attribBase(enumBase(tree.pos, c), baseEnv,
-                                  true, false, false)
-                : (c.fullname == names.java_lang_Object)
-                ? Type.noType
-                : syms.objectType;
+                    (tree.extending != null)
+                    ? attr.attribBase(tree.extending, baseEnv, true, false, true)
+                    : ((tree.mods.flags & Flags.ENUM) != 0 && !target.compilerBootstrap(c))
+                    ? attr.attribBase(enumBase(tree.pos, c), baseEnv,
+                    true, false, false)
+                    : (c.fullname == names.java_lang_Object)
+                    ? Type.noType
+                    : syms.objectType;
             ct.supertype_field = modelMissingTypes(supertype, tree.extending, false);
 
             // Determine interfaces.
@@ -898,29 +970,32 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             if ((tree.mods.flags & Flags.ENUM) != 0 && target.compilerBootstrap(c)) {
                 // add interface Comparable<T>
                 interfaceTrees =
-                    interfaceTrees.prepend(make.Type(new ClassType(syms.comparableType.getEnclosingType(),
-                                                                   List.of(c.type),
-                                                                   syms.comparableType.tsym)));
+                        interfaceTrees.prepend(make.Type(new ClassType(syms.comparableType.getEnclosingType(),
+                        List.of(c.type),
+                        syms.comparableType.tsym)));
                 // add interface Serializable
                 interfaceTrees =
-                    interfaceTrees.prepend(make.Type(syms.serializableType));
+                        interfaceTrees.prepend(make.Type(syms.serializableType));
             }
             for (JCExpression iface : interfaceTrees) {
                 Type i = attr.attribBase(iface, baseEnv, false, true, true);
                 if (i.tag == CLASS) {
                     interfaces.append(i);
-                    if (all_interfaces != null) all_interfaces.append(i);
+                    if (all_interfaces != null) {
+                        all_interfaces.append(i);
+                    }
                     chk.checkNotRepeated(iface.pos(), types.erasure(i), interfaceSet);
                 } else {
-                    if (all_interfaces == null)
+                    if (all_interfaces == null) {
                         all_interfaces = new ListBuffer<Type>().appendList(interfaces);
+                    }
                     all_interfaces.append(modelMissingTypes(i, iface, true));
                 }
             }
             if ((c.flags_field & ANNOTATION) != 0) {
                 ct.interfaces_field = List.of(syms.annotationType);
                 ct.all_interfaces_field = ct.interfaces_field;
-            }  else {
+            } else {
                 ct.interfaces_field = interfaces.toList();
                 ct.all_interfaces_field = (all_interfaces == null)
                         ? ct.interfaces_field : all_interfaces.toList();
@@ -929,12 +1004,11 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             if (c.fullname == names.java_lang_Object) {
                 if (tree.extending != null) {
                     chk.checkNonCyclic(tree.extending.pos(),
-                                       supertype);
+                            supertype);
                     ct.supertype_field = Type.noType;
-                }
-                else if (tree.implementing.nonEmpty()) {
+                } else if (tree.implementing.nonEmpty()) {
                     chk.checkNonCyclic(tree.implementing.head.pos(),
-                                       ct.interfaces_field.head);
+                            ct.interfaces_field.head);
                     ct.interfaces_field = List.nil();
                 }
             }
@@ -944,8 +1018,9 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             // can attribute the annotation types and then check to see if the
             // @Deprecated annotation is present.
             attr.attribAnnotationTypes(tree.mods.annotations, baseEnv);
-            if (hasDeprecatedAnnotation(tree.mods.annotations))
+            if (hasDeprecatedAnnotation(tree.mods.annotations)) {
                 c.flags_field |= DEPRECATED;
+            }
             annotateLater(tree.mods.annotations, baseEnv, c);
 
             chk.checkNonCyclicDecl(tree);
@@ -953,18 +1028,18 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             attr.attribTypeVariables(tree.typarams, baseEnv);
 
             // Add default constructor if needed.
-            if ((c.flags() & INTERFACE) == 0 &&
-                !TreeInfo.hasConstructors(tree.defs)) {
+            if ((c.flags() & INTERFACE) == 0
+                    && !TreeInfo.hasConstructors(tree.defs)) {
                 List<Type> argtypes = List.nil();
                 List<Type> typarams = List.nil();
                 List<Type> thrown = List.nil();
                 long ctorFlags = 0;
                 boolean based = false;
                 if (c.name.isEmpty()) {
-                    JCNewClass nc = (JCNewClass)env.next.tree;
+                    JCNewClass nc = (JCNewClass) env.next.tree;
                     if (nc.constructor != null) {
                         Type superConstrType = types.memberType(c.type,
-                                                                nc.constructor);
+                                nc.constructor);
                         argtypes = superConstrType.getParameterTypes();
                         typarams = superConstrType.getTypeArguments();
                         ctorFlags = nc.constructor.flags() & VARARGS;
@@ -976,8 +1051,8 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
                     }
                 }
                 JCTree constrDef = DefaultConstructor(make.at(tree.pos), c,
-                                                    typarams, argtypes, thrown,
-                                                    ctorFlags, based);
+                        typarams, argtypes, thrown,
+                        ctorFlags, based);
                 tree.defs = tree.defs.prepend(constrDef);
             }
 
@@ -985,13 +1060,13 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             // current scope.
             if ((c.flags_field & INTERFACE) == 0) {
                 VarSymbol thisSym =
-                    new VarSymbol(FINAL | HASINIT, names._this, c.type, c);
+                        new VarSymbol(FINAL | HASINIT, names._this, c.type, c);
                 thisSym.pos = Position.FIRSTPOS;
                 env.info.scope.enter(thisSym);
                 if (ct.supertype_field.tag == CLASS) {
                     VarSymbol superSym =
-                        new VarSymbol(FINAL | HASINIT, names._super,
-                                      ct.supertype_field, c);
+                            new VarSymbol(FINAL | HASINIT, names._super,
+                            ct.supertype_field, c);
                     superSym.pos = Position.FIRSTPOS;
                     env.info.scope.enter(superSym);
                 }
@@ -1000,12 +1075,11 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             // check that no package exists with same fully qualified name,
             // but admit classes in the unnamed package which have the same
             // name as a top-level package.
-            if (checkClash &&
-                c.owner.kind == PCK && c.owner != syms.unnamedPackage &&
-                reader.packageExists(c.fullname))
-                {
-                    log.error(tree.pos, "clash.with.pkg.of.same.name", Kinds.kindName(sym), c);
-                }
+            if (checkClash
+                    && c.owner.kind == PCK && c.owner != syms.unnamedPackage
+                    && reader.packageExists(c.fullname)) {
+                log.error(tree.pos, "clash.with.pkg.of.same.name", Kinds.kindName(sym), c);
+            }
 
         } catch (CompletionFailure ex) {
             chk.completionError(tree.pos(), ex);
@@ -1032,17 +1106,19 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
     private Env<AttrContext> baseEnv(JCClassDecl tree, Env<AttrContext> env) {
         Scope baseScope = new Scope(tree.sym);
         //import already entered local classes into base scope
-        for (Scope.Entry e = env.outer.info.scope.elems ; e != null ; e = e.sibling) {
+        for (Scope.Entry e = env.outer.info.scope.elems; e != null; e = e.sibling) {
             if (e.sym.isLocal()) {
                 baseScope.enter(e.sym);
             }
         }
         //import current type-parameters into base scope
-        if (tree.typarams != null)
+        if (tree.typarams != null) {
             for (List<JCTypeParameter> typarams = tree.typarams;
-                 typarams.nonEmpty();
-                 typarams = typarams.tail)
+                    typarams.nonEmpty();
+                    typarams = typarams.tail) {
                 baseScope.enter(typarams.head.type.tsym);
+            }
+        }
         Env<AttrContext> outer = env.outer; // the base clause can't see members of this class
         Env<AttrContext> localEnv = outer.dup(tree, outer.info.dup(baseScope));
         localEnv.baseClause = true;
@@ -1051,47 +1127,56 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
         return localEnv;
     }
 
-    /** Enter member fields and methods of a class
-     *  @param env        the environment current for the class block.
+    /**
+     * Enter member fields and methods of a class
+     *
+     * @param env the environment current for the class block.
      */
     private void finish(Env<AttrContext> env) {
         JavaFileObject prev = log.useSource(env.toplevel.sourcefile);
         try {
-            JCClassDecl tree = (JCClassDecl)env.tree;
+            JCClassDecl tree = (JCClassDecl) env.tree;
             finishClass(tree, env);
         } finally {
             log.useSource(prev);
         }
     }
 
-    /** Generate a base clause for an enum type.
-     *  @param pos              The position for trees and diagnostics, if any
-     *  @param c                The class symbol of the enum
+    /**
+     * Generate a base clause for an enum type.
+     *
+     * @param pos The position for trees and diagnostics, if any
+     * @param c The class symbol of the enum
      */
     private JCExpression enumBase(int pos, ClassSymbol c) {
         JCExpression result = make.at(pos).
-            TypeApply(make.QualIdent(syms.enumSym),
-                      List.<JCExpression>of(make.Type(c.type)));
+                TypeApply(make.QualIdent(syms.enumSym),
+                List.<JCExpression>of(make.Type(c.type)));
         return result;
     }
 
     Type modelMissingTypes(Type t, final JCExpression tree, final boolean interfaceExpected) {
-        if (t.tag != ERROR)
+        if (t.tag != ERROR) {
             return t;
+        }
 
         return new ErrorType(((ErrorType) t).getOriginalType(), t.tsym) {
+
             private Type modelType;
 
             @Override
             public Type getModelType() {
-                if (modelType == null)
+                if (modelType == null) {
                     modelType = new Synthesizer(getOriginalType(), interfaceExpected).visit(tree);
+                }
                 return modelType;
             }
         };
     }
     // where
+
     private class Synthesizer extends JCTree.Visitor {
+
         Type originalType;
         boolean interfaceExpected;
         List<ClassSymbol> synthesizedSymbols = List.nil();
@@ -1109,8 +1194,9 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
 
         List<Type> visit(List<? extends JCTree> trees) {
             ListBuffer<Type> lb = new ListBuffer<Type>();
-            for (JCTree t: trees)
+            for (JCTree t : trees) {
                 lb.append(visit(t));
+            }
             return lb.toList();
         }
 
@@ -1152,10 +1238,12 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
                 result = tree.type;
             } else {
                 ClassType clazzType = (ClassType) visit(tree.clazz);
-                if (synthesizedSymbols.contains(clazzType.tsym))
+                if (synthesizedSymbols.contains(clazzType.tsym)) {
                     synthesizeTyparams((ClassSymbol) clazzType.tsym, tree.arguments.size());
+                }
                 final List<Type> actuals = visit(tree.arguments);
                 result = new ErrorType(tree.type, clazzType.tsym) {
+
                     @Override
                     public List<Type> getTypeArguments() {
                         return actuals;
@@ -1169,6 +1257,7 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
             ClassSymbol c = new ClassSymbol(flags, name, owner);
             c.members_field = new Scope.ErrorScope(c);
             c.type = new ErrorType(originalType, c) {
+
                 @Override
                 public List<Type> getTypeArguments() {
                     return typarams_field;
@@ -1194,79 +1283,84 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
     }
 
 
-/* ***************************************************************************
- * tree building
- ****************************************************************************/
-
-    /** Generate default constructor for given class. For classes different
-     *  from java.lang.Object, this is:
+    /*
+     * ***************************************************************************
+     * tree building
+ ***************************************************************************
+     */
+    /**
+     * Generate default constructor for given class. For classes different from
+     * java.lang.Object, this is:
      *
-     *    c(argtype_0 x_0, ..., argtype_n x_n) throws thrown {
-     *      super(x_0, ..., x_n)
-     *    }
+     * c(argtype_0 x_0, ..., argtype_n x_n) throws thrown { super(x_0, ..., x_n)
+     * }
      *
-     *  or, if based == true:
+     * or, if based == true:
      *
-     *    c(argtype_0 x_0, ..., argtype_n x_n) throws thrown {
-     *      x_0.super(x_1, ..., x_n)
-     *    }
+     * c(argtype_0 x_0, ..., argtype_n x_n) throws thrown { x_0.super(x_1, ...,
+     * x_n) }
      *
-     *  @param make     The tree factory.
-     *  @param c        The class owning the default constructor.
-     *  @param argtypes The parameter types of the constructor.
-     *  @param thrown   The thrown exceptions of the constructor.
-     *  @param based    Is first parameter a this$n?
+     * @param make The tree factory.
+     * @param c The class owning the default constructor.
+     * @param argtypes The parameter types of the constructor.
+     * @param thrown The thrown exceptions of the constructor.
+     * @param based Is first parameter a this$n?
      */
     JCTree DefaultConstructor(TreeMaker make,
-                            ClassSymbol c,
-                            List<Type> typarams,
-                            List<Type> argtypes,
-                            List<Type> thrown,
-                            long flags,
-                            boolean based) {
+            ClassSymbol c,
+            List<Type> typarams,
+            List<Type> argtypes,
+            List<Type> thrown,
+            long flags,
+            boolean based) {
         List<JCVariableDecl> params = make.Params(argtypes, syms.noSymbol);
         List<JCStatement> stats = List.nil();
-        if (c.type != syms.objectType)
+        if (c.type != syms.objectType) {
             stats = stats.prepend(SuperCall(make, typarams, params, based));
-        if ((c.flags() & ENUM) != 0 &&
-            (types.supertype(c.type).tsym == syms.enumSym ||
-             target.compilerBootstrap(c))) {
+        }
+        if ((c.flags() & ENUM) != 0
+                && (types.supertype(c.type).tsym == syms.enumSym
+                || target.compilerBootstrap(c))) {
             // constructors of true enums are private
             flags = (flags & ~AccessFlags) | PRIVATE | GENERATEDCONSTR;
-        } else
+        } else {
             flags |= (c.flags() & AccessFlags) | GENERATEDCONSTR;
-        if (c.name.isEmpty()) flags |= ANONCONSTR;
+        }
+        if (c.name.isEmpty()) {
+            flags |= ANONCONSTR;
+        }
         JCTree result = make.MethodDef(
-            make.Modifiers(flags),
-            names.init,
-            null,
-            make.TypeParams(typarams),
-            params,
-            make.Types(thrown),
-            make.Block(0, stats),
-            null);
+                make.Modifiers(flags),
+                names.init,
+                null,
+                make.TypeParams(typarams),
+                params,
+                make.Types(thrown),
+                make.Block(0, stats),
+                null);
         return result;
     }
 
-    /** Generate call to superclass constructor. This is:
+    /**
+     * Generate call to superclass constructor. This is:
      *
-     *    super(id_0, ..., id_n)
+     * super(id_0, ..., id_n)
      *
      * or, if based == true
      *
-     *    id_0.super(id_1,...,id_n)
+     * id_0.super(id_1,...,id_n)
      *
-     *  where id_0, ..., id_n are the names of the given parameters.
+     * where id_0, ..., id_n are the names of the given parameters.
      *
-     *  @param make    The tree factory
-     *  @param params  The parameters that need to be passed to super
-     *  @param typarams  The type parameters that need to be passed to super
-     *  @param based   Is first parameter a this$n?
+     * @param make The tree factory
+     * @param params The parameters that need to be passed to super
+     * @param typarams The type parameters that need to be passed to super
+     * @param based Is first parameter a this$n?
      */
     JCExpressionStatement SuperCall(TreeMaker make,
-                   List<Type> typarams,
-                   List<JCVariableDecl> params,
-                   boolean based) {
+            List<Type> typarams,
+            List<JCVariableDecl> params,
+            boolean based) {
         JCExpression meth;
         if (based) {
             meth = make.Select(make.Ident(params.head), names._super);
