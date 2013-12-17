@@ -1,0 +1,263 @@
+
+CLASSPATH = $(CURDIR)/../src/share/classes
+
+TESTPATH = $(CURDIR)/../src/share/classes/test/tools/proxies
+
+TESTPACKAGE = test/tools/proxies
+
+JFLAGS = -classpath $(CLASSPATH)
+
+JCFLAGS = -jar ../build/bootstrap/lib/javac.jar -classpath $(CLASSPATH)
+
+.SUFFIXES: .java .class
+.java.class:
+		@java $(JCFLAGS) $*.java
+
+default: classes
+
+classes: ArgsRetTest GenericTest ImportTest InnerTest ManyTest MultiTest RedefAttrTest RedefTest ReflectTest SimpleExtendsTest SimpleTest StdLibTest VisibilityTest
+
+clean:
+		@$(RM) *.class 
+
+############################################################################## ArgRetTest
+
+ArgsRetTestPath = $(TESTPATH)/ArgsRetTest
+
+ArgsRetTestClasses = \
+		$(ArgsRetTestPath)/Subject.java \
+		$(ArgsRetTestPath)/RealSubject.java \
+		$(ArgsRetTestPath)/Main.java
+
+clean-ArgsRetTest :
+		@$(RM) $(ArgsRetTestPath)/*.class
+
+run-ArgsRetTest :
+		@echo
+		@echo "[ArgsRetTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/ArgsRetTest/Main
+
+ArgsRetTest: clean-ArgsRetTest $(ArgsRetTestClasses:clean) $(ArgsRetTestClasses:.java=.class) run-ArgsRetTest
+
+############################################################################## ArgRetTest
+
+GenericTestPath = $(TESTPATH)/GenericTest
+
+GenericTestClasses = \
+		$(GenericTestPath)/Main.java
+
+clean-GenericTest :
+		@$(RM) $(GenericTestPath)/*.class
+
+run-GenericTest :
+		@echo
+		@echo "[GenericTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/GenericTest/Main
+
+GenericTest: clean-GenericTest $(GenericTestClasses:.java=.class) run-GenericTest
+
+############################################################################## ImportTest
+
+ImportTestPath = $(TESTPATH)/ImportTest
+
+ImportTestClasses = \
+		$(ImportTestPath)/Main.java \
+		$(ImportTestPath)/Package/Main.java \
+		$(ImportTestPath)/RealSubject/RunnableRealSubject.java
+
+clean-ImportTest :
+		@$(RM) $(ImportTestPath)/*.class
+		@$(RM) $(ImportTestPath)/Package/*.class
+		@$(RM) $(ImportTestPath)/RealSubject/*.class
+
+run-ImportTest :
+		@echo
+		@echo "[ImportTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/ImportTest/Main
+
+ImportTest: clean-ImportTest $(ImportTestClasses:.java=.class) run-ImportTest
+
+############################################################################## InnerTest
+
+InnerTestPath = $(TESTPATH)/InnerTest
+
+InnerTestClasses = \
+		$(InnerTestPath)/Main.java
+
+clean-InnerTest :
+		@$(RM) $(InnerTestPath)/*.class
+
+run-InnerTest :
+		@echo
+		@echo "[InnerTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/InnerTest/Main
+
+InnerTest: clean-InnerTest $(InnerTestClasses:.java=.class) run-InnerTest
+
+############################################################################## ManyTest
+
+ManyTestPath = $(TESTPATH)/ManyTest
+
+ManyTestClasses = \
+		$(ManyTestPath)/Main.java \
+		$(ManyTestPath)/Main2.java \
+		$(ManyTestPath)/RealSubject.java \
+		$(ManyTestPath)/Subject.java \
+		$(ManyTestPath)/RS/RunnableRealSubject.java
+
+clean-ManyTest :
+		@$(RM) $(ManyTestPath)/*.class
+
+run-ManyTest :
+		@echo
+		@echo "[ManyTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/ManyTest/Main
+
+ManyTest: clean-ManyTest $(ManyTestClasses:.java=.class) run-ManyTest
+
+############################################################################## MultiTest
+
+MultiTestPath = $(TESTPATH)/MultiTest
+
+MultiTestClasses = \
+		$(MultiTestPath)/Main.java
+
+clean-MultiTest :
+		@$(RM) $(MultiTestPath)/*.class
+
+run-MultiTest :
+		@echo
+		@echo "[MultiTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/MultiTest/Main
+
+MultiTest: clean-MultiTest $(MultiTestClasses:.java=.class) run-MultiTest
+
+############################################################################## RedefAttrTest
+
+RedefAttrTestPath = $(TESTPATH)/RedefAttrTest
+
+RedefAttrTestClasses = \
+		$(RedefAttrTestPath)/Main.java \
+		$(RedefAttrTestPath)/RealSubject/RunnableRealSubject.java
+
+clean-RedefAttrTest :
+		@$(RM) $(RedefAttrTestPath)/*.class
+
+run-RedefAttrTest :
+		@echo
+		@echo "[RedefAttrTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/RedefAttrTest/Main
+
+RedefAttrTest: clean-RedefAttrTest $(RedefAttrTestClasses:.java=.class) run-RedefAttrTest
+
+############################################################################## RedefTest
+
+RedefTestPath = $(TESTPATH)/RedefTest
+
+RedefTestClasses = \
+		$(RedefTestPath)/Main.java \
+		$(RedefTestPath)/RealSubject/RunnableRealSubject.java
+
+clean-RedefTest :
+		@$(RM) $(RedefTestPath)/*.class
+
+run-RedefTest :
+		@echo
+		@echo "[RedefTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/RedefTest/Main
+
+RedefTest: clean-RedefTest $(RedefTestClasses:.java=.class) run-RedefTest
+
+############################################################################## ReflectTest
+
+ReflectTestPath = $(TESTPATH)/ReflectTest
+
+ReflectTestClasses = \
+		$(ReflectTestPath)/Main.java
+
+clean-ReflectTest :
+		@$(RM) $(ReflectTestPath)/*.class
+
+run-ReflectTest :
+		@echo
+		@echo "[ReflectTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/ReflectTest/Main
+
+ReflectTest: clean-ReflectTest $(ReflectTestClasses:.java=.class) run-ReflectTest
+
+############################################################################## SimpleExtendsTest
+
+SimpleExtendsTestPath = $(TESTPATH)/SimpleExtendsTest
+
+SimpleExtendsTestClasses = \
+		$(SimpleExtendsTestPath)/Main.java \
+		$(SimpleExtendsTestPath)/RealSubject.java \
+		$(SimpleExtendsTestPath)/Subject.java \
+		$(SimpleExtendsTestPath)/ToStringProxy.java
+
+clean-SimpleExtendsTest :
+		@$(RM) $(SimpleExtendsTestPath)/*.class
+
+run-SimpleExtendsTest :
+		@echo
+		@echo "[SimpleExtendsTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/SimpleExtendsTest/Main
+
+SimpleExtendsTest: clean-SimpleExtendsTest $(SimpleExtendsTestClasses:.java=.class) run-SimpleExtendsTest
+
+############################################################################## SimpleTest
+
+SimpleTestPath = $(TESTPATH)/SimpleTest
+
+SimpleTestClasses = \
+		$(SimpleTestPath)/Main.java \
+		$(SimpleTestPath)/RealSubject.java \
+		$(SimpleTestPath)/Subject.java
+
+clean-SimpleTest :
+		@$(RM) $(SimpleTestPath)/*.class
+
+run-SimpleTest :
+		@echo
+		@echo "[SimpleTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/SimpleTest/Main
+
+SimpleTest: clean-SimpleTest $(SimpleTestClasses:.java=.class) run-SimpleTest
+
+############################################################################## StdLibTest
+
+StdLibTestPath = $(TESTPATH)/StdLibTest
+
+StdLibTestClasses = \
+		$(StdLibTestPath)/Main.java
+
+clean-StdLibTest :
+		@$(RM) $(StdLibTestPath)/*.class
+
+run-StdLibTest :
+		@echo
+		@echo "[StdLibTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/StdLibTest/Main
+
+StdLibTest: clean-StdLibTest $(StdLibTestClasses:.java=.class) run-StdLibTest
+
+############################################################################## VisibilityTest
+
+VisibilityTestPath = $(TESTPATH)/VisibilityTest
+
+VisibilityTestClasses = \
+		$(VisibilityTestPath)/Main.java \
+		$(VisibilityTestPath)/RealSubject.java \
+		$(VisibilityTestPath)/Subject.java
+
+clean-VisibilityTest :
+		@$(RM) $(VisibilityTestPath)/*.class
+
+run-VisibilityTest : 
+		@echo
+		@echo "[VisibilityTest]"
+		@java $(JFLAGS) $(TESTPACKAGE)/VisibilityTest/Main
+
+VisibilityTest: clean-VisibilityTest $(VisibilityTestClasses:.java=.class) run-VisibilityTest
+
+
