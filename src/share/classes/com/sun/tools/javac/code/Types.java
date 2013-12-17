@@ -3383,7 +3383,7 @@ public class Types {
     }
 
     private boolean containsTypeEquivalent(Type t, Type s) {
-        return
+        return 
             isSameType(t, s) || // shortcut
             containsType(t, s) && containsType(s, t);
     }

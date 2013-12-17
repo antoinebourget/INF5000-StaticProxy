@@ -168,7 +168,7 @@ public class Enter extends JCTree.Visitor {
     /*
      * ************************************************************************
      * environment construction
- ************************************************************************
+     * ***********************************************************************
      */
     /**
      * Create a fresh environment for class bodies. This will create a fresh
@@ -233,7 +233,7 @@ public class Enter extends JCTree.Visitor {
     /*
      * ************************************************************************
      * Visitor methods for phase 1: class enter
- ************************************************************************
+     * ***********************************************************************
      */
     /**
      * Visitor argument: the current environment.

@@ -2636,7 +2636,17 @@ public class JavacParser implements Parser {
         JCExpression extending = null;
         if (S.token() == EXTENDS) {
             S.nextToken();
-            extending = parseType();
+            if (S.token() == PROXY) {
+                S.nextToken();
+                if (S.token() == LT) {
+                    mode = TYPE;
+                    checkGenerics();
+                    extending = proxyArguments(false);
+                }
+            } else {
+                extending = parseType();
+
+            }
         }
         List<JCExpression> implementing = List.nil();
         if (S.token() == IMPLEMENTS) {

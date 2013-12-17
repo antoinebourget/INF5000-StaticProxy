@@ -127,7 +127,7 @@ public class Lower extends TreeTranslator {
     /**
      * ************************************************************************
      * Global mappings
- ************************************************************************
+     * ***********************************************************************
      */
     /**
      * A hash table mapping local classes to their definitions.
@@ -469,7 +469,7 @@ public class Lower extends TreeTranslator {
     /**
      * ************************************************************************
      * Tree building blocks
- ************************************************************************
+     * ***********************************************************************
      */
     /**
      * Equivalent to make.at(pos.getStartPosition()) with side effect of caching
@@ -615,7 +615,7 @@ public class Lower extends TreeTranslator {
     /**
      * ************************************************************************
      * Symbol manipulation utilities
- ************************************************************************
+     * ***********************************************************************
      */
     /**
      * Enter a synthetic symbol in a given scope, but complain if there was
@@ -759,7 +759,7 @@ public class Lower extends TreeTranslator {
     /**
      * ************************************************************************
      * Access methods
- ************************************************************************
+     * ***********************************************************************
      */
     /**
      * Access codes for dereferencing, assignment, and pre/post
@@ -1407,7 +1407,7 @@ public class Lower extends TreeTranslator {
     /**
      * ************************************************************************
      * Free variables proxies and this$n
- ************************************************************************
+     * ***********************************************************************
      */
     /**
      * A scope containing all free variable proxies for currently translated
@@ -1811,7 +1811,7 @@ public class Lower extends TreeTranslator {
     /**
      * ************************************************************************
      * Code for .class
- ************************************************************************
+     * ***********************************************************************
      */
     /**
      * Return the symbol of a class to contain a cache of compiler-generated
@@ -2110,7 +2110,7 @@ public class Lower extends TreeTranslator {
     /**
      * ************************************************************************
      * Code for enabling/disabling assertions.
- ************************************************************************
+     * ***********************************************************************
      */
     // This code is not particularly robust if the user has
     // previously declared a member named '$assertionsDisabled'.
@@ -2155,7 +2155,7 @@ public class Lower extends TreeTranslator {
     /**
      * ************************************************************************
      * Building blocks for let expressions
- ************************************************************************
+     * ***********************************************************************
      */
     interface TreeBuilder {
 
@@ -2268,7 +2268,7 @@ public class Lower extends TreeTranslator {
     /**
      * ************************************************************************
      * Translation methods
- ************************************************************************
+     * ***********************************************************************
      */
     /**
      * Visitor argument: enclosing operator node.
@@ -3812,7 +3812,7 @@ public class Lower extends TreeTranslator {
     /**
      * ************************************************************************
      * main method
- ************************************************************************
+     * ***********************************************************************
      */
     /**
      * Translate a toplevel class and return a list consisting of the translated

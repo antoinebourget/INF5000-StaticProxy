@@ -412,7 +412,7 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
     /*
      * ********************************************************************
      * Visitor methods for member enter
- ********************************************************************
+     * *******************************************************************
      */
     /**
      * Visitor argument: the current environment
@@ -749,7 +749,7 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
     /*
      * ********************************************************************
      * Type completion
- ********************************************************************
+     * *******************************************************************
      */
     Type attribImportType(JCTree tree, Env<AttrContext> env) {
         Assert.check(completionEnabled);
@@ -766,7 +766,7 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
     /*
      * ********************************************************************
      * Annotation processing
- ********************************************************************
+     * *******************************************************************
      */
     /**
      * Queue annotations for later processing.
@@ -905,7 +905,7 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
     /*
      * ********************************************************************
      * Source completer
- ********************************************************************
+     * *******************************************************************
      */
     /**
      * Complete entering a class.
@@ -1286,7 +1286,7 @@ public class MemberEnter extends JCTree.Visitor implements Completer {
     /*
      * ***************************************************************************
      * tree building
- ***************************************************************************
+     * **************************************************************************
      */
     /**
      * Generate default constructor for given class. For classes different from

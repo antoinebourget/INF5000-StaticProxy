@@ -1727,7 +1727,7 @@ public class ClassReader implements Completer {
         }
 
         public void visitEnumAttributeProxy(EnumAttributeProxy prxy) {
-            // type.tsym.flatName() should == prxy.enumFlatName
+            // type.tsym.flatName() should == prxy .enumFlatName
             TypeSymbol enumTypeSym = prxy.enumType.tsym;
             VarSymbol enumerator = null;
             CompletionFailure failure = null;
@@ -2216,6 +2216,18 @@ public class ClassReader implements Completer {
      * Define a new class given its name and owner.
      */
     public ClassSymbol defineClass(Name name, Symbol owner) {
+        ClassSymbol c = new ClassSymbol(0, name, owner);
+        if (owner.kind == PCK) {
+            Assert.checkNull(classes.get(c.flatname), c);
+        }
+        c.completer = this;
+        return c;
+    }
+
+    /**
+     * Define a new prxy class given its name and owner.
+     */
+    public ClassSymbol defineProxyClass(Name name, Symbol owner) {
         ClassSymbol c = new ClassSymbol(0, name, owner);
         if (owner.kind == PCK) {
             Assert.checkNull(classes.get(c.flatname), c);

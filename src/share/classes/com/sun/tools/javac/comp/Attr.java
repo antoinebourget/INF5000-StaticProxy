@@ -50,6 +50,7 @@ import com.sun.source.util.SimpleTreeVisitor;
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.code.Kinds.*;
 import static com.sun.tools.javac.code.TypeTags.*;
+import com.sun.tools.javac.main.JavaCompiler;
 import javax.lang.model.type.TypeKind;
 
 /**
@@ -93,10 +94,11 @@ public class Attr extends JCTree.Visitor {
         }
         return instance;
     }
+    private final Context context;
 
     protected Attr(Context context) {
         context.put(attrKey, this);
-
+        this.context = context;
         names = Names.instance(context);
         log = Log.instance(context);
         syms = Symtab.instance(context);
@@ -3084,125 +3086,256 @@ public class Attr extends JCTree.Visitor {
         tree.type = result = t;
     }
 
-    public void visitProxyApply(JCProxyApply tree) {
-
-        ListBuffer<JCTree> defs = new ListBuffer<JCTree>();
-        // Attribute type parameters
-        List<Type> actuals = attribTypes(tree.arguments, env);
+    /**
+     * Create proxy name from list of types
+     * 
+     * @param types
+     * @return 
+     */
+    public String getProxyName(List<Type> types) {
         String name = "";
-        for (Type t : actuals) {
-            if (t != actuals.head) {
+        for (Type t : types) {
+            if (t != types.head) {
                 name += "$$";
             }
-            name += t.toString().replace(".", "$");
+            name += t.tsym.toString().replace(".", "$");
         }
-        name = "$proxy$" + name;
-        Symbol tsym;
-        if ((tsym = rs.findType(env, names.fromString(name))) instanceof Resolve.SymbolNotFoundError) {
-            ListBuffer<Type> params = new ListBuffer<Type>();
-            ListBuffer<Type> typarams = new ListBuffer<Type>();
-            ListBuffer<Type> thrown = new ListBuffer<Type>();
-            ListBuffer<JCStatement> stats = new ListBuffer<JCStatement>();
+        return "$proxy$" + name;
+    }
 
-            params.add(actuals.head);
-            List<JCVariableDecl> methodParams = make.Params(params.toList(), syms.noSymbol);
+    /*
+     * Build JCClassDecl for static proxy
+     */
+    public JCClassDecl createProxyClassDecl(JCProxyApply tree, Env<AttrContext> env) {
+        
+        ListBuffer<JCTree> defs = new ListBuffer<JCTree>();
+        ListBuffer<Type> params = new ListBuffer<Type>();
+        ListBuffer<Type> typarams = new ListBuffer<Type>();
+        ListBuffer<Type> thrown = new ListBuffer<Type>();
+        ListBuffer<JCStatement> stats = new ListBuffer<JCStatement>();
+        
+        // Get types of proxy
+        List<Type> actuals = attribTypes(tree.arguments, env);
+        // Get flat name of proxy
+        String proxyClassName = getProxyName(actuals);
 
-            int mIndex = 0;
-            for (JCExpression t : tree.arguments) {
-                Name mName = names.fromString("x" + String.valueOf(mIndex));
-                JCTree member_var = make.VarDef(make.Modifiers(PRIVATE), mName, t, null);
-
-                if (mIndex == 0) {
-                    JCExpressionStatement stat = make.Exec(make.Assign(make.Select(make.Ident(names._this), mName), make.Ident(methodParams.head)));
-                    stats.add(stat);
-                } else {
-                    JCExpressionStatement stat = make.Exec(make.Assign(make.Select(make.Ident(names._this), mName), make.TypeCast(t, make.Ident(methodParams.head))));
-                    stats.add(stat);
-                }
-
-                defs.add(member_var);
-                mIndex++;
+        // Create argument for proxy constructor
+        params.add(actuals.head);
+        List<JCVariableDecl> methodParams = make.Params(params.toList(), syms.noSymbol);
+        
+        // Create a member variable declaraction for every type in proxy
+        int mIndex = 0;
+        
+        for (Type t : actuals) {
+            Name mName = names.fromString("x" + String.valueOf(mIndex));
+            JCTree member_var = make.VarDef(make.Modifiers(Flags.PROTECTED | Flags.FINAL), mName, make.Type(t), null);
+            if (mIndex == 0) {
+                JCExpressionStatement stat = make.Exec(make.Assign(make.Select(make.Ident(names._this), mName), make.Ident(methodParams.head)));
+                stats.add(stat);
+            } else {
+                JCExpressionStatement stat = make.Exec(make.Assign(make.Select(make.Ident(names._this), mName), make.TypeCast(t, make.Ident(methodParams.head))));
+                stats.add(stat);
             }
+            defs.add(member_var);
+            mIndex++;
+        }
 
-            JCTree ctor = make.MethodDef(
-                    make.Modifiers(PUBLIC),
-                    names.init,
-                    (JCExpression) null,
-                    make.TypeParams(typarams.toList()),
-                    methodParams,
-                    make.Types(thrown.toList()),
-                    make.Block(0, stats.toList()),
-                    (JCExpression) null);
-            defs.add(ctor);
+        // Create constructor definition
+        JCTree ctor = make.MethodDef(
+                make.Modifiers(PUBLIC),
+                names.init,
+                (JCExpression) null,
+                make.TypeParams(typarams.toList()),
+                methodParams,
+                make.Types(thrown.toList()),
+                make.Block(0, stats.toList()),
+                (JCExpression) null);
+        defs.add(ctor);
 
-            for (Type t : actuals) {
-                for (Symbol s : t.tsym.getEnclosedElements()) {
-                    if (s instanceof MethodSymbol) {
-                        MethodSymbol ms = (MethodSymbol) s;
+        //For every type of proxy
+        for (Type t : actuals) {
+            //Loop through methods to need to be added to proxy
+            for (Symbol s : t.tsym.getEnclosedElements()) {
+                if (s instanceof MethodSymbol) {
+                    MethodSymbol ms = (MethodSymbol) s;
 
-                        //List<TypeSymbol> typeParamSymbols = ms.getTypeParameters();
-                        ListBuffer<Type> typeParams = new ListBuffer<Type>();
-                        for (List<TypeSymbol> l = ms.getTypeParameters(); l.nonEmpty(); l = l.tail) {
-                            typeParams.append(l.head.asType());
-                        }
-                        ListBuffer<JCVariableDecl> paramVarSymbol = new ListBuffer<JCVariableDecl>();
-                        ListBuffer<JCExpression> methodArgs = new ListBuffer<JCExpression>();
-                        for (List<VarSymbol> l = ms.getParameters(); l.nonEmpty(); l = l.tail) {
-                            JCVariableDecl varDecl = make.VarDef(l.head, null);
-                            paramVarSymbol.append(varDecl);
-                            methodArgs.append(make.Ident(varDecl));
-                        }
-
-                        ListBuffer<JCStatement> proxyMethodStats = new ListBuffer<JCStatement>();
-                        String methodName = names._this.toString() + ".x" + String.valueOf(actuals.indexOf(t));
-
-                        if (ms.getReturnType().getKind() == TypeKind.VOID) {
-
-                            JCFieldAccess fieldAccess = make.Select(make.Ident(names.fromString(methodName)), ms.getSimpleName());
-                            fieldAccess.setType(ms.getReturnType());
-                            JCMethodInvocation methodInvocation = make.App(fieldAccess, methodArgs.toList());
-
-                            proxyMethodStats.append(make.Exec(methodInvocation));
-
-
-
-                        } else {
-                            JCFieldAccess fieldAccess = make.Select(make.Ident(names.fromString(methodName)), ms.getSimpleName());
-                            fieldAccess.setType(ms.getReturnType());
-                            JCMethodInvocation methodInvocation = make.App(fieldAccess, methodArgs.toList());
-
-                            proxyMethodStats.append(make.Return(methodInvocation));
-
-                        }
-
-
-                        JCTree proxyMethodDef = make.MethodDef(
-                                make.Modifiers(PUBLIC),
-                                ms.getSimpleName(),
-                                make.Type(ms.getReturnType()),
-                                make.TypeParams(typeParams.toList()),
-                                paramVarSymbol.toList(),
-                                make.Types(ms.getThrownTypes()),
-                                make.Block(0, proxyMethodStats.toList()),
-                                (JCExpression) null);
-                        defs.add(proxyMethodDef);
+                    // Create method's type parameter for proxy
+                    ListBuffer<Type> typeParams = new ListBuffer<Type>();
+                    for (List<TypeSymbol> l = ms.getTypeParameters(); l.nonEmpty(); l = l.tail) {
+                        typeParams.append(l.head.asType());
+                    }
+                    
+                    // Create method's parameters
+                    // TODO: find a way to deal with generics
+                    ListBuffer<JCVariableDecl> paramVarSymbol = new ListBuffer<JCVariableDecl>();
+                    ListBuffer<JCExpression> methodArgs = new ListBuffer<JCExpression>();
+                    for (List<VarSymbol> l = ms.getParameters(); l.nonEmpty(); l = l.tail) {
+                        VarSymbol vs = l.head;
+                        VarSymbol clone = vs.clone(null);
+                        JCVariableDecl varDecl = make.VarDef(clone, null);
+                        paramVarSymbol.append(varDecl);
+                        methodArgs.append(make.Ident(varDecl));
                     }
 
+                    // Create method statements to call actual class
+                    ListBuffer<JCStatement> proxyMethodStats = new ListBuffer<JCStatement>();
+                    String methodName = "x" + String.valueOf(actuals.indexOf(t));
+                    JCMethodInvocation mi = makeCall(
+                                make.Select(make.Ident(names._this), names.fromString(methodName)).setType(t),
+                                ms.name,
+                                methodArgs.toList());
+                    if (ms.getReturnType().getKind() == TypeKind.VOID) {
+                        proxyMethodStats.append(make.Exec(mi));
+                    } else {
+                        proxyMethodStats.append(make.Return(mi));
+                    }
+
+                    // Create return type
+                    Type resType = ms.getReturnType();
+                    if (resType.getTypeArguments().length() > 0) {
+
+                        resType = t.withTypeVar(resType.getTypeArguments().head);
+                        resType = new ClassType(Type.noType, resType.getTypeArguments(), ms.getReturnType().tsym);
+                    }
+                    
+                    // Create proxy method definition
+                    JCTree proxyMethodDef = make.MethodDef(
+                            make.Modifiers(PUBLIC),
+                            ms.getSimpleName(),
+                            make.Type(resType),
+                            make.TypeParams(typeParams.toList()),
+                            paramVarSymbol.toList(),
+                            make.Types(ms.getThrownTypes()),
+                            make.Block(0, proxyMethodStats.toList()),
+                            (JCExpression) null);
+                    defs.add(proxyMethodDef);
                 }
+
             }
+        }
+        
+        // Create proxy class declaration
+        JCClassDecl cd = make.ClassDef(make.Modifiers(0), names.fromString(proxyClassName), make.TypeParams(typarams.toList()), null, tree.arguments, defs.toList());
 
-            JCClassDecl clazzdef = make.ClassDef(make.Modifiers(0), names.fromString(name), make.TypeParams(typarams.toList()), null, tree.arguments, defs.toList());
-            //Env<AttrContext> localEnv = env.dup(tree, env.info.dup());
+        return cd;
+    }
 
-            enter.classEnter(clazzdef, env);
-            //attribClass(clazzdef.sym);
-            //visitClassDef(clazzdef)
-            System.out.println(clazzdef.toString());
-            tsym = clazzdef.sym;
+    /**
+     * Static proxy notation, return existing proxy or create it
+     * from list of type parameters
+     * 
+     * @param tree 
+     */
+    public void visitProxyApply(JCProxyApply tree) {
+        // Attribute type parameters
+        List<Type> actuals = attribTypes(tree.arguments, env);
+        
+        // Get Proxy symbol name from list of types
+        String name = getProxyName(actuals);
+        
+        Symbol tsym = rs.findType(env, names.fromString(name));
+        // Create Proxy if it doesnt exist
+        if (tsym instanceof Resolve.SymbolNotFoundError) {
+
+            ClassSymbol sProxy = makeEmptyProxy(
+                    Flags.PUBLIC + Flags.UNATTRIBUTED,
+                    names.fromString(name),
+                    "",
+                    actuals.head,
+                    make.TypeParams(actuals.head.getParameterTypes()));
+            
+            //Build Class Declaration
+            JCClassDecl cd = createProxyClassDecl(tree, env);
+            cd.sym = sProxy;
+
+            //Put proxy in same package as calling class
+            Env<AttrContext> top = Enter.instance(context).getTopLevelEnv(env.toplevel);
+            Env<AttrContext> localEnv = Enter.instance(context).classEnv(cd, top);
+
+            // Put built proxy in Enter for later completion
+            Env<AttrContext> prev = this.env;
+            this.env = localEnv;
+            Enter.instance(context).classEnter(cd, top);
+            cd.sym.complete();
+            this.env = prev;
+
+            tsym = cd.sym;
         }
 
         result = check(tree, tsym.type, TYP, pkind, pt);
+    }
+    
+    /**
+     * @author Alexandre Terrasa
+     * 
+     * @param left
+     * @param name
+     * @param args
+     * @return 
+     */
+    private JCMethodInvocation makeCall(JCExpression left, Name name, List<JCExpression> args) {
+        Assert.checkNonNull(left.type);
+        DiagnosticPosition pos = left.pos();
+        Symbol funcsym = lookupMethod(pos, name, left.type, TreeInfo.types(args));
+        return make.App(make.Select(left, funcsym), args);
 
+    }
+    
+    /**
+     * @author Alexandre Terrasa
+     * 
+     * @param pos
+     * @param name
+     * @param qual
+     * @param args
+     * @return 
+     */
+    private MethodSymbol lookupMethod(DiagnosticPosition pos, Name name, Type qual, List<Type> args) {
+        return rs.resolveInternalMethod(pos, env, qual, name, args, null);
+    }
+
+    /**
+     * 
+     * @author Alexandre Terrasa
+     * 
+     * Make an empty proxy class definition and enter and complete its symbol.
+     * Return the class definition's symbol. and create
+     *
+     * @param flags The class symbol's flags
+     * @param name The class name
+     */
+    ClassSymbol makeEmptyProxy(long flags, Name name, String root, Type implementing, List<JCTypeParameter> typarams) {
+        // Create class symbol.
+        ClassSymbol c = ClassReader.instance(context).defineProxyClass(name, ((ClassSymbol) implementing.tsym).packge());
+
+        // Set Proxy file location
+        c.flatname = names.fromString(root + "." + ClassSymbol.formFlatName(name, ((ClassSymbol) implementing.tsym).packge()));
+        c.fullname = names.fromString(root + "." + ClassSymbol.formFullName(name, ((ClassSymbol) implementing.tsym).packge()));
+        c.sourcefile = ((ClassSymbol) implementing.tsym).sourcefile;
+
+
+        c.completer = null;
+        c.members_field = new Scope(c);
+        c.flags_field = flags;
+
+        ClassType ctype = (ClassType) c.type;
+        ctype.supertype_field = syms.objectType;
+        ctype.interfaces_field = List.<Type>of(implementing);
+
+        chk.compiled.put(c.flatname, c);
+
+        // Create class definition tree.
+        JCClassDecl cProxy = make.ClassDef(
+                make.Modifiers(flags),
+                name,
+                typarams,
+                make.Type(syms.objectType),
+                List.<JCExpression>of(make.Type(implementing)),
+                List.<JCTree>nil());
+        cProxy.sym = c;
+        cProxy.type = c.type;
+
+        return c;
     }
 
     public void visitTypeParameter(JCTypeParameter tree) {
